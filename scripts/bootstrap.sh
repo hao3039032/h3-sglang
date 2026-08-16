@@ -2,12 +2,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SGLANG_PIN="${H3_SGLANG_PIN:-d3589a7251e4df6710e14ac55071585e80ae62c7}"
-SGLANG_SOURCE="${H3_SGLANG_SOURCE:-https://github.com/sgl-project/sglang.git}"
+SGLANG_PIN="${H3_SGLANG_PIN:-480a8ba7cae46658380428576b51d682f28489f1}"
+SGLANG_SOURCE="${H3_SGLANG_SOURCE:-https://github.com/hao3039032/sglang-h3.git}"
 SGLANG_DIR="${H3_SGLANG_DIR:-$ROOT/.third_party/sglang}"
 VENV_DIR="${H3_VENV:-$ROOT/.venv}"
-PATCH_DIR="$ROOT/patches/sglang"
-PATCHES=("$PATCH_DIR"/*.patch)
 
 if [[ ! -d "$VENV_DIR" ]]; then
   python3.12 -m venv "$VENV_DIR"
@@ -34,30 +32,9 @@ if [[ "$current_head" != "$SGLANG_PIN" ]]; then
   git fetch origin "$SGLANG_PIN"
   git checkout "$SGLANG_PIN"
 elif [[ "$source_is_clean" != 1 ]]; then
-  all_patches_applied=1
-  for patch in "${PATCHES[@]}"; do
-    if ! git apply --reverse --check "$patch"; then
-      all_patches_applied=0
-      break
-    fi
-  done
-  if [[ "$all_patches_applied" != 1 ]]; then
-    printf 'SGLang source has unrelated or partially applied changes.\n' >&2
-    exit 1
-  fi
-fi
-
-for patch in "${PATCHES[@]}"; do
-  if git apply --reverse --check "$patch"; then
-    continue
-  fi
-  if git apply --check "$patch"; then
-    git apply "$patch"
-    continue
-  fi
-  printf 'SGLang source does not match patch: %s\n' "$patch" >&2
+  printf 'SGLang fork source has unrelated local changes.\n' >&2
   exit 1
-done
+fi
 
 if [[ "${H3_SKIP_APP_INSTALL:-0}" != "1" ]]; then
   if command -v uv >/dev/null 2>&1; then
@@ -83,4 +60,4 @@ if ! "$PYTHON" -c 'import ninja' >/dev/null 2>&1; then
   "$PYTHON" -m pip install 'ninja>=1.11,<2'
 fi
 
-printf 'SGLang %s is patched and installed in %s.\n' "$SGLANG_PIN" "$VENV_DIR"
+printf 'SGLang fork %s is installed in %s.\n' "$SGLANG_PIN" "$VENV_DIR"

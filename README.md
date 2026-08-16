@@ -4,10 +4,11 @@ This repository packages a native MiniMax-H3 REF2VA deployment with a small
 Gradio frontend. It is intended for platforms that provide a complete external
 MiniMax-H3 model directory and all visible GPUs to the container.
 
-The deployment pins SGLang to commit
-`d3589a7251e4df6710e14ac55071585e80ae62c7`. Platform images containing
-SGLang 0.5.1 are too old for H3. A small patch also allows the custom
-480-pixel short-edge target while retaining the native 768-pixel target.
+The deployment pins the `h3` branch from
+[hao3039032/sglang-h3](https://github.com/hao3039032/sglang-h3) to commit
+`480a8ba7cae46658380428576b51d682f28489f1`. Platform images containing
+SGLang 0.5.1 are too old for H3. The fork also allows the custom 480-pixel
+short-edge target while retaining the native 768-pixel target.
 
 ## Precision Policy
 
@@ -27,9 +28,9 @@ SGLang 0.5.1 are too old for H3. A small patch also allows the custom
 ./scripts/bootstrap.sh
 ```
 
-This creates `.venv`, checks out the pinned SGLang commit under
-`.third_party/sglang`, applies all patches in `patches/sglang`, and installs
-both SGLang and this repository. It never downloads model weights.
+This creates `.venv`, checks out the pinned SGLang fork commit under
+`.third_party/sglang`, and installs both SGLang and this repository. It never
+downloads model weights.
 The host or container must also provide `ffprobe`; SGLang uses it to validate
 the final MiniMax H3 output.
 
