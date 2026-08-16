@@ -14,11 +14,18 @@ WORKDIR /opt/h3-sglang
 
 COPY . /opt/h3-sglang
 
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN git init /opt/sglang-src \
     && git -C /opt/sglang-src remote add origin "$SGLANG_SOURCE" \
     && git -C /opt/sglang-src fetch --depth 1 origin "$SGLANG_PIN" \
     && git -C /opt/sglang-src checkout FETCH_HEAD \
-    && git -C /opt/sglang-src apply /opt/h3-sglang/patches/sglang/0001-allow-minimax-h3-480p-targets.patch \
+    && for patch in /opt/h3-sglang/patches/sglang/*.patch; do \
+      git -C /opt/sglang-src apply "$patch" || exit 1; \
+    done \
+    && python3 -m pip install 'ninja>=1.11,<2' \
     && python3 -m pip install --no-deps --force-reinstall -e /opt/sglang-src/python \
     && python3 -m pip install "/opt/sglang-src/python[diffusion]" \
     && python3 -m pip install --no-deps --force-reinstall /opt/h3-sglang \

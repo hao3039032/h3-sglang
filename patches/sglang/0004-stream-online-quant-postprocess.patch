@@ -1,0 +1,60 @@
+diff --git a/python/sglang/multimodal_gen/runtime/loader/fsdp_load.py b/python/sglang/multimodal_gen/runtime/loader/fsdp_load.py
+--- a/python/sglang/multimodal_gen/runtime/loader/fsdp_load.py
++++ b/python/sglang/multimodal_gen/runtime/loader/fsdp_load.py
+@@ -9,6 +9,7 @@ Adapted from torchtune
+ from collections import Counter, defaultdict
+ from collections.abc import Callable, Generator
+ from itertools import chain
++import os
+ from types import MethodType
+ from typing import Any
+ 
+@@ -63,7 +64,18 @@ def _is_bitsandbytes_quant_config(quant_config: Any | None) -> bool:
+     quant_name_getter = getattr(type(quant_config), "get_name", None)
+     return bool(callable(quant_name_getter) and quant_name_getter() == "bitsandbytes")
+ 
+ 
++def _should_stream_quant_postprocess(
++    weight_load_plan: WeightLoadPlan, load_on_cpu: bool
++) -> bool:
++    enabled = os.environ.get("SGLANG_ONLINE_QUANT_STREAM_POSTPROCESS", "").lower()
++    return (
++        enabled in {"1", "true", "yes"}
++        and load_on_cpu
++        and weight_load_plan.checkpoint_load_device.type == "cpu"
++    )
++
++
+ def _format_dtype_mismatch_summary(
+     mismatch_counts: Counter[tuple[torch.dtype, torch.dtype]],
+     mismatch_examples: dict[tuple[torch.dtype, torch.dtype], list[str]],
+@@ -418,6 +431,16 @@ def maybe_load_fsdp_model
+ 
+     # 3. postprocessing
++    stream_quant_postprocess = _should_stream_quant_postprocess(
++        weight_load_plan, load_on_cpu
++    )
++    if weight_postprocess_device is not None and not stream_quant_postprocess:
+         # move to device to perform postprocessing
+         model.to(weight_postprocess_device)
+ 
++    if stream_quant_postprocess and weight_postprocess_device is not None:
++        logger.info(
++            "Streaming online-quant weight postprocessing through %s",
++            weight_postprocess_device,
++        )
++
+     for _, module in model.named_modules():
+@@ -428,8 +447,12 @@ def maybe_load_fsdp_model(
+             if _is_npu and not isinstance(quant_method, UnquantizedLinearMethod):
+                 # Activate the NZ format for storing weights,
+                 # which is a specific optimization for Ascend NPU
+                 torch.npu.config.allow_internal_format = True
++            if stream_quant_postprocess and weight_postprocess_device is not None:
++                module.to(weight_postprocess_device)
+             quant_method.process_weights_after_loading(module)
++            if stream_quant_postprocess and weight_postprocess_device is not None:
++                module.to("cpu")
+             if _is_npu:
+                 torch.npu.empty_cache()
+     model.post_load_weights()

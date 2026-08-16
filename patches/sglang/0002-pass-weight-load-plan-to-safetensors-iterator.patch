@@ -1,0 +1,12 @@
+diff --git a/python/sglang/multimodal_gen/runtime/loader/fsdp_load.py b/python/sglang/multimodal_gen/runtime/loader/fsdp_load.py
+index 5278e79c6..7ee26e1fd 100644
+--- a/python/sglang/multimodal_gen/runtime/loader/fsdp_load.py
++++ b/python/sglang/multimodal_gen/runtime/loader/fsdp_load.py
+@@ -380,6 +380,7 @@ def maybe_load_fsdp_model(
+             weight_iterator = safetensors_weights_iterator(
+                 weight_dir_list,
+                 key_filter=checkpoint_key_filter,
++                weight_load_plan=weight_load_plan,
+             )
+         if preprocess_loaded_state_dict is not None:
+             weight_iterator = preprocess_loaded_state_dict(weight_iterator)

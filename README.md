@@ -28,8 +28,10 @@ SGLang 0.5.1 are too old for H3. A small patch also allows the custom
 ```
 
 This creates `.venv`, checks out the pinned SGLang commit under
-`.third_party/sglang`, applies the 480p patch, and installs both SGLang and
-this repository. It never downloads model weights.
+`.third_party/sglang`, applies all patches in `patches/sglang`, and installs
+both SGLang and this repository. It never downloads model weights.
+The host or container must also provide `ffprobe`; SGLang uses it to validate
+the final MiniMax H3 output.
 
 Serve SGLang and Gradio separately when developing:
 
@@ -55,6 +57,11 @@ memory placement, and 20 resident DiT blocks. The launcher does not pass
 `--num-gpus` unless `H3_NUM_GPUS` is explicitly set. This lets GPU visibility
 be controlled by `CUDA_VISIBLE_DEVICES`, the container runtime, or the
 platform's process environment.
+
+With `H3_DIT_QUANT=fp8`, the 5090 launcher keeps checkpoint tensors on CPU and
+streams each quantized module through the GPU only for weight postprocessing.
+This avoids materializing the complete quantized DiT on one 32 GB GPU before
+layerwise residency is configured.
 
 For a 4x RTX 4090 candidate, start with:
 

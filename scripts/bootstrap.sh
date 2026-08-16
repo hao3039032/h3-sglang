@@ -6,20 +6,8 @@ SGLANG_PIN="${H3_SGLANG_PIN:-d3589a7251e4df6710e14ac55071585e80ae62c7}"
 SGLANG_SOURCE="${H3_SGLANG_SOURCE:-https://github.com/sgl-project/sglang.git}"
 SGLANG_DIR="${H3_SGLANG_DIR:-$ROOT/.third_party/sglang}"
 VENV_DIR="${H3_VENV:-$ROOT/.venv}"
-PATCH="$ROOT/patches/sglang/0001-allow-minimax-h3-480p-targets.patch"
-
-check_patch() {
-  if git apply --reverse --check "$PATCH"; then
-    printf 'SGLang 480p patch is already applied.\n'
-    return 0
-  fi
-  if git apply --check "$PATCH"; then
-    git apply "$PATCH"
-    return 0
-  fi
-  printf 'SGLang source does not match the pinned 480p patch.\n' >&2
-  return 1
-}
+PATCH_DIR="$ROOT/patches/sglang"
+PATCHES=("$PATCH_DIR"/*.patch)
 
 if [[ ! -d "$VENV_DIR" ]]; then
   python3.12 -m venv "$VENV_DIR"
@@ -31,29 +19,45 @@ if [[ ! -d "$SGLANG_DIR/.git" ]]; then
 fi
 
 cd "$SGLANG_DIR"
-if git apply --reverse --check "$PATCH"; then
-  patched=1
-else
-  patched=0
-fi
-if [[ "$patched" == 0 ]] && ! git diff --quiet; then
-  printf 'SGLang source has unrelated local changes; refusing to update.\n' >&2
-  exit 1
+current_head="$(git rev-parse HEAD)"
+source_is_clean=0
+if git diff --quiet && git diff --cached --quiet; then
+  source_is_clean=1
 fi
 
-current_head="$(git rev-parse HEAD)"
 if [[ "$current_head" != "$SGLANG_PIN" ]]; then
-  if [[ "$patched" == 1 ]]; then
-    printf 'Patched SGLang source is not at the expected commit; refusing to switch versions.\n' >&2
+  if [[ "$source_is_clean" != 1 ]]; then
+    printf 'SGLang source HEAD %s is not pinned and has local changes.\n' \
+      "$current_head" >&2
     exit 1
   fi
   git fetch origin "$SGLANG_PIN"
   git checkout "$SGLANG_PIN"
+elif [[ "$source_is_clean" != 1 ]]; then
+  all_patches_applied=1
+  for patch in "${PATCHES[@]}"; do
+    if ! git apply --reverse --check "$patch"; then
+      all_patches_applied=0
+      break
+    fi
+  done
+  if [[ "$all_patches_applied" != 1 ]]; then
+    printf 'SGLang source has unrelated or partially applied changes.\n' >&2
+    exit 1
+  fi
 fi
 
-if [[ "$patched" == 0 ]]; then
-  check_patch
-fi
+for patch in "${PATCHES[@]}"; do
+  if git apply --reverse --check "$patch"; then
+    continue
+  fi
+  if git apply --check "$patch"; then
+    git apply "$patch"
+    continue
+  fi
+  printf 'SGLang source does not match patch: %s\n' "$patch" >&2
+  exit 1
+done
 
 if [[ "${H3_SKIP_APP_INSTALL:-0}" != "1" ]]; then
   if command -v uv >/dev/null 2>&1; then
@@ -70,6 +74,13 @@ if [[ "${H3_SKIP_SGLANG_INSTALL:-0}" != "1" ]]; then
   else
     "$PYTHON" -m pip install -e "$SGLANG_DIR/python[diffusion]"
   fi
+fi
+
+# FlashInfer JIT invokes ninja by name. A system-site venv can expose the
+# Python package while its executable remains outside PATH; serve.sh discovers
+# that directory dynamically.
+if ! "$PYTHON" -c 'import ninja' >/dev/null 2>&1; then
+  "$PYTHON" -m pip install 'ninja>=1.11,<2'
 fi
 
 printf 'SGLang %s is patched and installed in %s.\n' "$SGLANG_PIN" "$VENV_DIR"
