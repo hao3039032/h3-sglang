@@ -1,0 +1,10 @@
+.git
+.gitignore
+.pytest_cache
+.ruff_cache
+.venv
+.third_party
+__pycache__
+outputs
+*.py[cod]
+.env
